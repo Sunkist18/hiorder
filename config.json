@@ -1,0 +1,33 @@
+{
+  "prices": {
+    "store_device": {
+      "normal": {
+        "monthly": 7000,
+        "lump_sum": 237000
+      },
+      "calc": {
+        "monthly": 9000,
+        "lump_sum": 324000
+      }
+    },
+    "board": {
+      "inch10": 7000,
+      "inch15": 9000
+    }
+  },
+  "service_fee": 13000,
+  "commission": {
+    "basic1": 36000,
+    "basic2": 18000,
+    "cond1_over5": 180000,
+    "cond2_range": {
+      "5-10": 135000,
+      "11-20": 270000,
+      "21-30": 450000,
+      "31-40": 630000,
+      "41-": 900000
+    },
+    "shinhan_bonus": 800000
+  },
+  "admin_code": "hiorder2025"
+}
