@@ -41,6 +41,119 @@ def calculate_commission(total_devices, config, use_shinhan):
     
     return commission
 
+def apply_custom_css():
+    st.markdown("""
+        <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+        <style>
+            /* 기본 폰트 설정 */
+            * {
+                font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif !important;
+            }
+            
+            /* 마크다운 헤더 크기 및 마진 조정 */
+            .stMarkdown h1 {
+                font-size: 1.8em !important;
+                font-weight: 700 !important;
+                margin: 0.5em 0 !important;
+            }
+            
+            .stMarkdown h2 {
+                font-size: 1.5em !important;
+                font-weight: 600 !important;
+                margin: 0.4em 0 !important;
+            }
+            
+            .stMarkdown h3 {
+                font-size: 1.2em !important;
+                font-weight: 600 !important;
+                margin: 0.3em 0 !important;
+            }
+            
+            /* 강조 색상 설정 */
+            .stMarkdown a, 
+            .stMarkdown strong,
+            .stMarkdown em {
+                color: rgb(0, 113, 255) !important;
+            }
+            
+            /* 버든 버튼 기본 스타일 (button과 download_button 모두 포함) */
+            .stButton button,
+            .stDownloadButton button {
+                background-color: rgb(0, 113, 255) !important;
+                color: white !important;
+                border: none !important;
+                padding: 0.5rem 1rem !important;
+                border-radius: 4px !important;
+                transition: all 0.3s ease !important;
+            }
+            
+            /* 버튼 호버 효과 */
+            .stButton button:hover,
+            .stDownloadButton button:hover {
+                background-color: rgb(0, 90, 204) !important;
+                color: white !important;
+                border: none !important;
+            }
+            
+            /* 사이드바 버튼 특별 스타일 */
+            .sidebar .stButton button {
+                width: 100% !important;
+                text-align: left !important;
+                background-color: transparent !important;
+                color: rgb(0, 113, 255) !important;
+                border: 1px solid rgb(0, 113, 255) !important;
+                margin-bottom: 0.2rem !important;
+            }
+            
+            /* 사이드바 버튼 호버 효과 */
+            .sidebar .stButton button:hover {
+                background-color: rgba(0, 113, 255, 0.1) !important;
+                color: rgb(0, 113, 255) !important;
+            }
+            
+            /* 선택된 항목 강조 */
+            .stSelectbox:focus,
+            .stTextInput:focus {
+                border-color: rgb(0, 113, 255) !important;
+            }
+            
+            /* 프로그레스 바 색상 */
+            .stProgress > div > div > div > div {
+                background-color: rgb(0, 113, 255) !important;
+            }
+            
+            /* 체크박스, 라디오 버튼 등의 강조 색상 */
+            .stCheckbox:checked,
+            .stRadio:checked {
+                background-color: rgb(0, 113, 255) !important;
+            }
+            
+            /* 코드 블록 스타일링 */
+            code {
+                color: rgb(0, 113, 255) !important;
+                background-color: rgba(0, 113, 255, 0.1) !important;
+                padding: 0.2em 0.4em !important;
+                border-radius: 3px !important;
+            }
+            
+            /* 로그인 폼 스타일링 */
+            .login-form {
+                max-width: 400px;
+                margin: 0 auto;
+                padding: 2rem;
+                background-color: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            
+            .login-form input {
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+
 # 일시불 처리 가능 대수 계산
 def calculate_lump_sum_devices(store_device_count, device_type, commission, config):
     if device_type == "normal":
@@ -49,26 +162,36 @@ def calculate_lump_sum_devices(store_device_count, device_type, commission, conf
         lump_sum_price = config['prices']['store_device']['calc']['lump_sum']
     
     possible_devices = math.floor(commission / lump_sum_price)
-    return min(possible_devices, store_device_count)
+    actual_devices = min(possible_devices, store_device_count)
+    remaining_commission = commission - (actual_devices * lump_sum_price)
+    
+    return actual_devices, remaining_commission
 
 def main():
     st.set_page_config(page_title="하이오더 월 비용 계산기", layout="wide")
+    apply_custom_css()
     
     config = load_config()
     
-    # 헤더 영역
-    header_col1, header_col2 = st.columns([4, 1])
-    with header_col1:
-        st.title("하이오더 월 비용 계산기")
-    with header_col2:
-        if st.button("관리자 페이지로 이동", type="secondary", use_container_width=True):
-            st.session_state.page = "admin"
+    # 사이드바에 페이지 이동 버튼 추가
+    with st.sidebar:
+        st.markdown("### 메뉴")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🏠 메인", use_container_width=True):
+                st.session_state.page = "main"
+        with col2:
+            if st.button("⚙️ 관리자", use_container_width=True):
+                st.session_state.page = "admin"
+    
+    # 메인 타이틀
+    st.title("하이오더 계산기")
     
     # 세션 상태 초기화
     if "board_type" not in st.session_state:
-        st.session_state.board_type = "10인치"
+        st.session_state.board_type = "15인치"
     if "device_type" not in st.session_state:
-        st.session_state.device_type = "일반형"
+        st.session_state.device_type = "후불형"
     
     # 기본 페이지 (사용자용)
     if "page" not in st.session_state or st.session_state.page == "main":
@@ -86,21 +209,23 @@ def main():
                 index=0 if st.session_state.board_type == "10인치" else 1
             )
             
+            st.caption(f"선택된 기기: **{board_type}** (월 `{config['prices']['board']['inch'+board_type[:2]]:,}`원)")
+            
             st.markdown("---")
             
             # 매장용 기기 종류
             st.subheader("매장용 기기 선택")
             device_type = st.radio(
                 "매장용 기기 종류를 선택하세요:",
-                ["일반형", "계산형"],
-                format_func=lambda x: f"{x} (월 `{config['prices']['store_device']['normal' if x=='일반형' else 'calc']['monthly']:,}`원)",
+                ["후불형", "선불형"],
+                format_func=lambda x: f"{x} (월 `{config['prices']['store_device']['normal' if x=='후불형' else 'calc']['monthly']:,}`원)",
                 horizontal=True,
-                index=0 if st.session_state.device_type == "일반형" else 1
+                index=0 if st.session_state.device_type == "후불형" else 1
             )
             
-            device_key = "normal" if device_type == "일반형" else "calc"
+            device_key = "normal" if device_type == "후불형" else "calc"
             
-            st.caption(f"선택된 기기: {device_type} (월 `{config['prices']['store_device'][device_key]['monthly']:,}`원)")
+            st.caption(f"선택된 기기: **{device_type}** (월 `{config['prices']['store_device'][device_key]['monthly']:,}`원)")
             
             st.markdown("---")
             
@@ -118,7 +243,7 @@ def main():
             # 신한은행 주거래 통장
             st.subheader("신한은행 주거래 통장")
             use_shinhan = st.checkbox(
-                f"신한은행 주거래 통장 사용 (수수료 +`{config['commission']['shinhan_bonus']/10000:,.0f}`만원)"
+                f"**신한은행 주거래 통장** 사용 (수수료 +`{config['commission']['shinhan_bonus']/10000:,.0f}`만원)"
             )
             
             st.markdown("---")
@@ -132,7 +257,7 @@ def main():
                 commission = calculate_commission(total_devices, config, use_shinhan)
                 
                 # 일시불 처리 가능 대수 계산
-                lump_sum_devices = calculate_lump_sum_devices(
+                actual_devices, remaining_commission = calculate_lump_sum_devices(
                     store_device_count,
                     device_key,
                     commission,
@@ -146,33 +271,38 @@ def main():
                 board_monthly = config['prices']['board']['inch10' if board_type == "10인치" else 'inch15']
                 
                 # 매장용 기기 월 할부금 (일시불 처리 후 남은 기기만)
-                remaining_devices = store_device_count - lump_sum_devices
+                remaining_devices = store_device_count - actual_devices
                 device_monthly = config['prices']['store_device'][device_key]['monthly']
                 store_device_monthly = remaining_devices * device_monthly
                 
                 # 총 월 비용
                 total_monthly = monthly_service_fee + board_monthly + store_device_monthly
                 
+                # 남은 수수료를 36개월로 나누어 월 비용에서 차감
+                monthly_commission_discount = remaining_commission / 36
+                final_monthly = total_monthly - monthly_commission_discount
+                
                 # 기기당 월 예상 금액
-                per_device_monthly = total_monthly / total_devices
+                per_device_monthly = final_monthly / total_devices
                 
                 # 결과 표시
                 st.markdown("---")
                 st.subheader("계산 결과")
-                st.markdown(f"### 기기당 월 예상 금액: {per_device_monthly:,.0f}원")
+                st.markdown(f"### 기기당 월 예상 금액: **{per_device_monthly:,.0f}**원")
+                st.caption(f"36개월 총 비용: `{final_monthly * 36:,}`원")
                 
                 # 자세히 보기
                 with st.expander("자세히 보기"):
                     st.markdown(f"""
                     ### 1. 기본 정보
-                    - **총 기기 수**: {total_devices}대
-                      - 알림판: 1대 ({board_type}, 월 `{board_monthly:,}`원)
-                      - 매장용 기기: {store_device_count}대 ({device_type}, 월 `{device_monthly:,}`원)
+                    - 총 기기 수: `{total_devices}`대
+                      - 알림판: `1`대 ({board_type}, 월 `{board_monthly:,}`원)
+                      - 매장용 기기: `{store_device_count}`대 ({device_type}, 월 `{device_monthly:,}`원)
 
                     ### 2. 수수료 계산 상세
                     #### 2.1 기본 수수료
-                    - 기본 수수료 1: {total_devices:,}대 × `{config['commission']['basic1']:,}`원 = {total_devices * config['commission']['basic1']:,}원
-                    - 기본 수수료 2: {total_devices:,}대 × `{config['commission']['basic2']:,}`원 = {total_devices * config['commission']['basic2']:,}원
+                    - 기본 수수료 1: `{total_devices:,}`대 × `{config['commission']['basic1']:,}`원 = `{total_devices * config['commission']['basic1']:,}`원
+                    - 기본 수수료 2: `{total_devices:,}`대 × `{config['commission']['basic2']:,}`원 = `{total_devices * config['commission']['basic2']:,}`원
                     
                     #### 2.2 조건부 수수료
                     """)
@@ -182,7 +312,7 @@ def main():
                     
                     # 기본 수수료
                     base_commission = total_devices * (config['commission']['basic1'] + config['commission']['basic2'])
-                    commission_details.append(["기본 수수료", f"{base_commission:,}원"])
+                    commission_details.append(["기본 수수료", f"`{base_commission:,}`원"])
                     
                     # 5대 이상 조건
                     if total_devices >= 5:
@@ -215,7 +345,7 @@ def main():
                         commission_details.append(["신한은행 주거래 보너스", f"`{config['commission']['shinhan_bonus']:,}`원"])
                     
                     # 총 수수료
-                    commission_details.append(["총 수수료", f"{commission:,}원"])
+                    commission_details.append(["총 수수료", f"`{commission:,}`원"])
                     
                     # 표 생성 및 표시
                     df = pd.DataFrame(commission_details, columns=["구분", "금액"])
@@ -224,12 +354,12 @@ def main():
                     st.markdown(f"""
                     ### 3. 일시불 처리 계산
                     - 매장용 기기 일시불 가격: `{config['prices']['store_device'][device_key]['lump_sum']:,}`원
-                    - 총 수수료: {commission:,}원
-                    - 일시불 처리 가능 대수: {lump_sum_devices}대
+                    - 총 수수료: `{commission:,}`원
+                    - 일시불 처리 가능 대수: `{actual_devices}`대
                       - 계산식: min(⌊수수료 ÷ 일시불가격⌋, 매장용기기수)
-                      - = min(⌊{commission:,} ÷ `{config['prices']['store_device'][device_key]['lump_sum']:,}`⌋, {store_device_count})
-                      - = min({math.floor(commission/config['prices']['store_device'][device_key]['lump_sum'])}, {store_device_count})
-                      - = {lump_sum_devices}
+                      - = min(⌊`{commission:,}` ÷ `{config['prices']['store_device'][device_key]['lump_sum']:,}`⌋, `{store_device_count}`)
+                      - = min(`{math.floor(commission/config['prices']['store_device'][device_key]['lump_sum'])}`, `{store_device_count}`)
+                      - = `{actual_devices}`
 
                     ### 4. 월 비용 상세 계산
                     """)
@@ -237,10 +367,11 @@ def main():
                     # 월 비용 상세 표 생성
                     monthly_details = [
                         ["구분", "계산식", "금액"],
-                        ["1. 월 서비스 이용료", f"`{config['service_fee']:,}`원 × {total_devices}대", f"{monthly_service_fee:,}원"],
-                        ["2. 알림판 할부금", f"{board_type} 할부금 (`{board_monthly:,}`원)", f"{board_monthly:,}원"],
-                        ["3. 매장용 기기 할부금", f"`{device_monthly:,}`원 × {remaining_devices}대", f"{store_device_monthly:,}원"],
-                        ["월 총액", "1 + 2 + 3", f"{total_monthly:,}원"]
+                        ["1. 월 서비스 이용료", f"`{config['service_fee']:,}`원 × `{total_devices}`대", f"`{monthly_service_fee:,}`원"],
+                        ["2. 알림판 할부금", f"{board_type} 할부금 (`{board_monthly:,}`원)", f"`{board_monthly:,}`원"],
+                        ["3. 매장용 기기 할부금", f"`{device_monthly:,}`원 × `{remaining_devices}`대", f"`{store_device_monthly:,}`원"],
+                        ["4. 남은 수수료 할인", f"(`{remaining_commission:,}`원 ÷ 36개월)", f"-`{monthly_commission_discount:,.0f}`원"],
+                        ["월 총액", "1 + 2 + 3 - 4", f"`{final_monthly:,.0f}`원"]
                     ]
                     
                     df_monthly = pd.DataFrame(monthly_details[1:], columns=monthly_details[0])
@@ -249,25 +380,19 @@ def main():
                     st.markdown(f"""
                     ### 5. 기기당 월 예상 금액 계산
                     - 계산식: 월 총액 ÷ 총 기기 수
-                    - = {total_monthly:,}원 ÷ {total_devices}대
-                    - = {per_device_monthly:,.0f}원
+                    - = `{final_monthly:,.0f}`원 ÷ `{total_devices}`대
+                    - = `{per_device_monthly:,.0f}`원
 
                     ### 6. 36개월 총 비용 예상
-                    - 월 고정 비용: {total_monthly:,}원
-                    - 36개월 총 비용: {total_monthly * 36:,}원
-                    - 일시불 처리 비용: {lump_sum_devices}대 × `{config['prices']['store_device'][device_key]['lump_sum']:,}`원 = {lump_sum_devices * config['prices']['store_device'][device_key]['lump_sum']:,}원
+                    - 월 고정 비용: `{final_monthly:,.0f}`원
+                    - 36개월 총 비용: `{final_monthly * 36:,}`원
+                    - 일시불 처리 비용: `{actual_devices}`대 × `{config['prices']['store_device'][device_key]['lump_sum']:,}`원 = `{actual_devices * config['prices']['store_device'][device_key]['lump_sum']:,}`원
+                    - 남은 수수료: `{remaining_commission:,}`원 (월 `{monthly_commission_discount:,.0f}`원씩 36개월 할인)
                     """)
     
     # 관리자 페이지
     elif st.session_state.page == "admin":
         st.title("관리자 설정")
-        
-        # 메인 페이지로 돌아가기 버튼
-        if st.button("메인 페이지로 돌아가기", type="secondary", use_container_width=True):
-            st.session_state.page = "main"
-            st.rerun()
-        
-        st.markdown("---")
         
         # 관리자 인증
         admin_code = st.text_input("관리자 코드를 입력하세요:", type="password")
@@ -280,8 +405,8 @@ def main():
             # 가격 설정
             st.subheader("매장용 기기 가격 설정")
             
-            # 일반형 매장용 기기
-            st.markdown("##### 일반형 매장용 기기")
+            # 후불형 매장용 기기
+            st.markdown("##### 후불형 매장용 기기")
             config['prices']['store_device']['normal']['monthly'] = st.number_input(
                 "월 할부금",
                 value=config['prices']['store_device']['normal']['monthly'],
@@ -295,15 +420,15 @@ def main():
             
             st.markdown("---")
             
-            # 계산형 매장용 기기
-            st.markdown("##### 계산형 매장용 기기")
+            # 선불형 매장용 기기
+            st.markdown("##### 선불형 매장용 기기")
             config['prices']['store_device']['calc']['monthly'] = st.number_input(
-                "월 할부금 (계산형)",
+                "월 할부금 (선불형)",
                 value=config['prices']['store_device']['calc']['monthly'],
                 step=1000
             )
             config['prices']['store_device']['calc']['lump_sum'] = st.number_input(
-                "일시불 가격 (계산형)",
+                "일시불 가격 (선불형)",
                 value=config['prices']['store_device']['calc']['lump_sum'],
                 step=10000
             )
