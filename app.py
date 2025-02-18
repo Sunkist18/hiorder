@@ -209,10 +209,10 @@ def main():
             st.subheader("알림판 선택 (필수)")
             board_type = st.radio(
                 "알림판 크기를 선택하세요:",
-                ["10인치", "15인치"],
+                ["15인치", "10인치"],
                 format_func=lambda x: f"{x} (월 `{config['prices']['board']['inch'+x[:2]]:,}`원)",
                 horizontal=True,
-                index=0 if st.session_state.board_type == "10인치" else 1
+                index=0 if st.session_state.board_type == "15인치" else 1
             )
             
             st.caption(f"선택된 기기: **{board_type}** (월 `{config['prices']['board']['inch'+board_type[:2]]:,}`원)")
