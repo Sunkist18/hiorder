@@ -13,7 +13,7 @@ def save_config(config):
         json.dump(config, f, indent=2, ensure_ascii=False)
 
 # 수수료 계산 함수
-def calculate_commission(total_devices, config, use_shinhan):
+def calculate_commission(total_devices, config, use_shinhan, use_internet_new, use_internet_kt):
     commission = 0
     
     # 기본 수수료
@@ -38,6 +38,12 @@ def calculate_commission(total_devices, config, use_shinhan):
     # 신한은행 주거래 통장
     if use_shinhan:
         commission += config['commission']['shinhan_bonus']
+    
+    # 인터넷 신규/기존KT 수수료
+    if use_internet_new:
+        commission += config['commission']['internet_new']
+    elif use_internet_kt:
+        commission += config['commission']['internet_kt']
     
     return commission
 
@@ -248,13 +254,28 @@ def main():
             
             st.markdown("---")
             
+            # 인터넷 관련 체크박스
+            st.subheader("인터넷 결합")
+            use_internet_new = st.checkbox(
+                f"**인터넷 신규** 신청 (수수료 +`{config['commission']['internet_new']/10000:,.0f}`만원, 월 `{config['internet']['monthly_discount']:,}`원 할인)"
+            )
+            use_internet_kt = st.checkbox(
+                f"**기존 KT 인터넷** 사용 (수수료 +`{config['commission']['internet_kt']/10000:,.0f}`만원, 월 `{config['internet']['monthly_discount']:,}`원 할인)",
+                disabled=use_internet_new
+            )
+            
+            if use_internet_new and use_internet_kt:
+                use_internet_kt = False
+            
+            st.markdown("---")
+            
             # 계산하기 버튼
             if st.button("계산하기", type="primary", use_container_width=True):
                 # 총 기기 수 (알림판 1대 + 매장용 기기)
                 total_devices = store_device_count + 1
                 
                 # 수수료 계산
-                commission = calculate_commission(total_devices, config, use_shinhan)
+                commission = calculate_commission(total_devices, config, use_shinhan, use_internet_new, use_internet_kt)
                 
                 # 일시불 처리 가능 대수 계산
                 actual_devices, remaining_commission = calculate_lump_sum_devices(
@@ -280,7 +301,11 @@ def main():
                 
                 # 남은 수수료를 36개월로 나누어 월 비용에서 차감
                 monthly_commission_discount = remaining_commission / 36
-                final_monthly = total_monthly - monthly_commission_discount
+                
+                # 인터넷 결합 할인 적용
+                internet_discount = config['internet']['monthly_discount'] if (use_internet_new or use_internet_kt) else 0
+                
+                final_monthly = total_monthly - monthly_commission_discount - internet_discount
                 
                 # 기기당 월 예상 금액
                 per_device_monthly = final_monthly / total_devices
@@ -344,6 +369,12 @@ def main():
                     if use_shinhan:
                         commission_details.append(["신한은행 주거래 보너스", f"`{config['commission']['shinhan_bonus']:,}`원"])
                     
+                    # 인터넷 관련 수수료
+                    if use_internet_new:
+                        commission_details.append(["인터넷 신규 신청 보너스", f"`{config['commission']['internet_new']:,}`원"])
+                    elif use_internet_kt:
+                        commission_details.append(["기존 KT 인터넷 보너스", f"`{config['commission']['internet_kt']:,}`원"])
+                    
                     # 총 수수료
                     commission_details.append(["총 수수료", f"`{commission:,}`원"])
                     
@@ -370,9 +401,13 @@ def main():
                         ["1. 월 서비스 이용료", f"`{config['service_fee']:,}`원 × `{total_devices}`대", f"`{monthly_service_fee:,}`원"],
                         ["2. 알림판 할부금", f"{board_type} 할부금 (`{board_monthly:,}`원)", f"`{board_monthly:,}`원"],
                         ["3. 매장용 기기 할부금", f"`{device_monthly:,}`원 × `{remaining_devices}`대", f"`{store_device_monthly:,}`원"],
-                        ["4. 남은 수수료 할인", f"(`{remaining_commission:,}`원 ÷ 36개월)", f"-`{monthly_commission_discount:,.0f}`원"],
-                        ["월 총액", "1 + 2 + 3 - 4", f"`{final_monthly:,.0f}`원"]
+                        ["4. 남은 수수료 할인", f"(`{remaining_commission:,}`원 ÷ 36개월)", f"-`{monthly_commission_discount:,.0f}`원"]
                     ]
+                    
+                    if internet_discount > 0:
+                        monthly_details.append(["5. 인터넷 결합 할인", f"월 고정 할인", f"-`{internet_discount:,}`원"])
+                    
+                    monthly_details.append(["월 총액", "1 + 2 + 3 - 4 - 5", f"`{final_monthly:,.0f}`원"])
                     
                     df_monthly = pd.DataFrame(monthly_details[1:], columns=monthly_details[0])
                     st.table(df_monthly)
@@ -521,6 +556,21 @@ def main():
             config['commission']['shinhan_bonus'] = st.number_input(
                 "신한은행 주거래 통장 보너스",
                 value=config['commission']['shinhan_bonus'],
+                step=10000
+            )
+            
+            st.markdown("---")
+            
+            # 인터넷 관련 수수료
+            st.markdown("##### 인터넷 관련 수수료")
+            config['commission']['internet_new'] = st.number_input(
+                "인터넷 신규 신청 수수료",
+                value=config['commission']['internet_new'],
+                step=10000
+            )
+            config['commission']['internet_kt'] = st.number_input(
+                "기존 KT 인터넷 수수료",
+                value=config['commission']['internet_kt'],
                 step=10000
             )
             
