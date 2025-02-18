@@ -256,12 +256,15 @@ def main():
             
             # 인터넷 관련 체크박스
             st.subheader("인터넷 결합")
-            use_internet_new = st.checkbox(
-                f"**인터넷 신규** 신청 (수수료 +`{config['commission']['internet_new']/10000:,.0f}`만원, 월 `{config['internet']['monthly_discount']:,}`원 할인)"
-            )
+            use_internet_new = False
+            use_internet_kt = False
+            
             use_internet_kt = st.checkbox(
                 f"**기존 KT 인터넷** 사용 (수수료 +`{config['commission']['internet_kt']/10000:,.0f}`만원, 월 `{config['internet']['monthly_discount']:,}`원 할인)",
-                disabled=use_internet_new
+            )
+            
+            use_internet_new = st.checkbox(
+                f"**인터넷 신규** 신청 (수수료 +`{config['commission']['internet_new']/10000:,.0f}`만원, 월 `{config['internet']['monthly_discount']:,}`원 할인)",
             )
             
             if use_internet_new and use_internet_kt:
