@@ -13,31 +13,29 @@ def save_config(config):
         json.dump(config, f, indent=2, ensure_ascii=False)
 
 # 수수료 계산 함수
-def calculate_commission(total_devices, config, use_shinhan, use_internet_new, use_internet_kt):
+def calculate_commission(total_devices, config, use_shinhan, use_internet_new, use_internet_kt, use_tanggua=False):
     commission = 0
     
     # 기본 수수료
     commission += total_devices * (config['commission']['basic1'] + config['commission']['basic2'])
     
-    # 5대 이상 조건
-    if total_devices >= 5:
-        commission += config['commission']['cond1_over5']
-    
     # 구간별 추가 수수료
-    if 5 <= total_devices <= 10:
-        commission += config['commission']['cond2_range']['5-10']
-    elif 11 <= total_devices <= 20:
-        commission += config['commission']['cond2_range']['11-20']
-    elif 21 <= total_devices <= 30:
-        commission += config['commission']['cond2_range']['21-30']
-    elif 31 <= total_devices <= 40:
-        commission += config['commission']['cond2_range']['31-40']
-    elif total_devices >= 41:
-        commission += config['commission']['cond2_range']['41-']
+    if 5 <= total_devices <= 9:
+        commission += config['commission']['range']['5-9']
+    elif 10 <= total_devices <= 19:
+        commission += config['commission']['range']['10-19']
+    elif 20 <= total_devices <= 29:
+        commission += config['commission']['range']['20-29']
+    elif total_devices >= 30:
+        commission += config['commission']['range']['30+']
     
     # 신한은행 주거래 통장
     if use_shinhan:
         commission += config['commission']['shinhan_bonus']
+    
+    # 땡겨요 어플 설치
+    if use_tanggua:
+        commission += config['commission']['tanggua_bonus']
     
     # 인터넷 신규/기존KT 수수료
     if use_internet_new:
@@ -192,12 +190,21 @@ def main():
     
     # 메인 타이틀
     st.title("하이오더 계산기")
+    st.markdown("<p style='font-size: 14px; margin-top: -15px; color: gray;'>3월정책반영</p>", unsafe_allow_html=True)
     
     # 세션 상태 초기화
     if "board_type" not in st.session_state:
         st.session_state.board_type = "15인치"
     if "device_type" not in st.session_state:
         st.session_state.device_type = "후불형"
+    if "custom_commission" not in st.session_state:
+        st.session_state.custom_commission = False
+    if "custom_commission_amount" not in st.session_state:
+        st.session_state.custom_commission_amount = 0
+    if "commission" not in st.session_state:
+        st.session_state.commission = 0
+    if "calculation_done" not in st.session_state:
+        st.session_state.calculation_done = False
     
     # 기본 페이지 (사용자용)
     if "page" not in st.session_state or st.session_state.page == "main":
@@ -252,6 +259,10 @@ def main():
                 f"**신한은행 주거래 통장** 사용 (수수료 +`{config['commission']['shinhan_bonus']:,}`원)"
             )
             
+            use_tanggua = st.checkbox(
+                f"**땡겨요어플설치** (수수료 +`{config['commission']['tanggua_bonus']:,}`원)"
+            )
+            
             st.markdown("---")
             
             # 인터넷 관련 체크박스
@@ -282,7 +293,9 @@ def main():
                 total_devices = store_device_count + 1
                 
                 # 수수료 계산
-                commission = calculate_commission(total_devices, config, use_shinhan, use_internet_new, use_internet_kt)
+                commission = calculate_commission(total_devices, config, use_shinhan, use_internet_new, use_internet_kt, use_tanggua)
+                st.session_state.commission = commission
+                st.session_state.calculation_done = True
                 
                 # 일시불 처리 가능 대수 계산
                 actual_devices, remaining_commission = calculate_lump_sum_devices(
@@ -317,24 +330,152 @@ def main():
                 # 기기당 월 예상 금액
                 per_device_monthly = final_monthly / total_devices
                 
-                # 결과 표시
+                # 계산 관련 값들을 세션 상태에 저장
+                st.session_state.total_devices = total_devices
+                st.session_state.board_monthly = board_monthly
+                st.session_state.board_type = board_type
+                st.session_state.device_monthly = device_monthly
+                st.session_state.device_type = device_type
+                st.session_state.store_device_count = store_device_count
+                st.session_state.device_key = device_key
+                st.session_state.monthly_service_fee = monthly_service_fee
+                st.session_state.remaining_devices = remaining_devices
+                st.session_state.store_device_monthly = store_device_monthly
+                st.session_state.total_monthly = total_monthly
+                st.session_state.monthly_commission_discount = monthly_commission_discount
+                st.session_state.internet_discount = internet_discount
+                st.session_state.final_monthly = final_monthly
+                st.session_state.per_device_monthly = per_device_monthly
+                st.session_state.actual_devices = actual_devices
+                st.session_state.remaining_commission = remaining_commission
+            
+            # 계산 결과 표시 (세션 상태에 저장된 값 사용)
+            if "calculation_done" in st.session_state and st.session_state.calculation_done:
                 st.markdown("---")
                 st.subheader("계산 결과")
-                st.markdown(f"### 기기당 월 예상 금액: **{per_device_monthly:,.0f}**원")
-                st.caption(f"36개월 총 비용: `{final_monthly * 36:,}`원")
+                
+                # 기기당 월 예상 금액
+                col1, col2 = st.columns([3, 2])
+                with col1:
+                    st.markdown(f"### 기기당 월 예상 금액: **{st.session_state.per_device_monthly:,.0f}**원")
+                    st.caption(f"36개월 총 비용: `{st.session_state.final_monthly * 36:,}`원")
+                
+                with col2:
+                    # 수수료별도적용 체크박스 상태 유지
+                    custom_commission = st.checkbox(
+                        "수수료별도적용", 
+                        value=st.session_state.custom_commission,
+                        key="custom_commission_checkbox"
+                    )
+                    st.session_state.custom_commission = custom_commission
+                    
+                    if custom_commission:
+                        st.markdown(f"총 수수료: **{st.session_state.commission:,}**원")
+                        custom_commission_amount = st.number_input(
+                            "적용할 수수료 금액",
+                            min_value=0,
+                            max_value=int(st.session_state.commission),
+                            value=int(st.session_state.custom_commission_amount) if st.session_state.custom_commission_amount > 0 else int(st.session_state.commission),
+                            step=100000,
+                            key="custom_commission_amount_input"
+                        )
+                        st.session_state.custom_commission_amount = custom_commission_amount
+                        
+                        # 사용자 지정 수수료로 재계산
+                        if custom_commission_amount != st.session_state.commission:
+                            # 일시불 처리 가능 대수 재계산
+                            actual_devices_custom, remaining_commission_custom = calculate_lump_sum_devices(
+                                st.session_state.store_device_count,
+                                st.session_state.device_key,
+                                custom_commission_amount,
+                                config
+                            )
+                            
+                            # 월 비용 재계산
+                            remaining_devices_custom = st.session_state.store_device_count - actual_devices_custom
+                            store_device_monthly_custom = remaining_devices_custom * st.session_state.device_monthly
+                            
+                            total_monthly_custom = st.session_state.monthly_service_fee + st.session_state.board_monthly + store_device_monthly_custom
+                            monthly_commission_discount_custom = remaining_commission_custom / 36
+                            
+                            final_monthly_custom = total_monthly_custom - monthly_commission_discount_custom - st.session_state.internet_discount
+                            
+                            per_device_monthly_custom = final_monthly_custom / st.session_state.total_devices
+                            
+                            st.markdown(f"### 재계산된 기기당 월 예상 금액: **{per_device_monthly_custom:,.0f}**원")
+                            st.caption(f"36개월 총 비용: `{final_monthly_custom * 36:,}`원")
+                            
+                            # 수수료별도적용 상세 내역 표시 (새로 추가)
+                            with st.expander("수수료별도적용 자세히 보기"):
+                                st.markdown(f"""
+                                ### 1. 기본 정보 (수수료별도적용)
+                                - 총 기기 수: `{st.session_state.total_devices}`대
+                                  - 알림판: `1`대 ({st.session_state.board_type}, 월 `{st.session_state.board_monthly:,}`원)
+                                  - 매장용 기기: `{st.session_state.store_device_count}`대 ({st.session_state.device_type}, 월 `{st.session_state.device_monthly:,}`원)
+
+                                ### 2. 수수료 계산 상세 (수수료별도적용)
+                                - 적용 수수료: `{custom_commission_amount:,}`원 (원래 수수료: `{st.session_state.commission:,}`원)
+                                  - 수수료 변동액: `{custom_commission_amount - st.session_state.commission:,}`원
+                                
+                                ### 3. 일시불 처리 계산 (수수료별도적용)
+                                - 매장용 기기 일시불 가격: `{config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`원
+                                - 총 수수료: `{custom_commission_amount:,}`원
+                                - 일시불 처리 가능 대수: `{actual_devices_custom}`대 (원래: `{st.session_state.actual_devices}`대)
+                                  - 계산식: min(⌊수수료 ÷ 일시불가격⌋, 매장용기기수)
+                                  - = min(⌊`{custom_commission_amount:,}` ÷ `{config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`⌋, `{st.session_state.store_device_count}`)
+                                  - = min(`{math.floor(custom_commission_amount/config['prices']['store_device'][st.session_state.device_key]['lump_sum'])}`, `{st.session_state.store_device_count}`)
+                                  - = `{actual_devices_custom}`
+
+                                ### 4. 월 비용 상세 계산 (수수료별도적용)
+                                """)
+                                
+                                # 월 비용 상세 표 생성 (수수료별도적용)
+                                monthly_details_custom = [
+                                    ["구분", "계산식", "금액"],
+                                    ["1. 월 서비스 이용료", f"`{config['service_fee']:,}`원 × `{st.session_state.total_devices}`대", f"`{st.session_state.monthly_service_fee:,}`원"],
+                                    ["2. 알림판 할부금", f"{st.session_state.board_type} 할부금 (`{st.session_state.board_monthly:,}`원)", f"`{st.session_state.board_monthly:,}`원"],
+                                    ["3. 매장용 기기 할부금", f"`{st.session_state.device_monthly:,}`원 × `{remaining_devices_custom}`대", f"`{store_device_monthly_custom:,}`원"],
+                                    ["4. 남은 수수료 할인", f"(`{remaining_commission_custom:,}`원 ÷ 36개월)", f"-`{monthly_commission_discount_custom:,.0f}`원"]
+                                ]
+                                
+                                if st.session_state.internet_discount > 0:
+                                    monthly_details_custom.append(["5. 인터넷 결합 할인", f"월 고정 할인", f"-`{st.session_state.internet_discount:,}`원"])
+                                
+                                monthly_details_custom.append(["월 총액", "1 + 2 + 3 - 4 - 5", f"`{final_monthly_custom:,.0f}`원"])
+                                
+                                df_monthly_custom = pd.DataFrame(monthly_details_custom[1:], columns=monthly_details_custom[0])
+                                st.table(df_monthly_custom)
+                                
+                                st.markdown(f"""
+                                ### 5. 기기당 월 예상 금액 계산 (수수료별도적용)
+                                - 계산식: 월 총액 ÷ 총 기기 수
+                                - = `{final_monthly_custom:,.0f}`원 ÷ `{st.session_state.total_devices}`대
+                                - = `{per_device_monthly_custom:,.0f}`원
+
+                                ### 6. 36개월 총 비용 예상 (수수료별도적용)
+                                - 월 고정 비용: `{final_monthly_custom:,.0f}`원
+                                - 36개월 총 비용: `{final_monthly_custom * 36:,}`원
+                                - 일시불 처리 비용: `{actual_devices_custom}`대 × `{config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`원 = `{actual_devices_custom * config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`원
+                                - 남은 수수료: `{remaining_commission_custom:,}`원 (월 `{monthly_commission_discount_custom:,.0f}`원씩 36개월 할인)
+                                
+                                ### 7. 원래 계산과 비교
+                                - 원래 기기당 월 예상 금액: `{st.session_state.per_device_monthly:,.0f}`원
+                                - 재계산된 기기당 월 예상 금액: `{per_device_monthly_custom:,.0f}`원
+                                - 차이: `{per_device_monthly_custom - st.session_state.per_device_monthly:,.0f}`원
+                                """)
                 
                 # 자세히 보기
                 with st.expander("자세히 보기"):
                     st.markdown(f"""
                     ### 1. 기본 정보
-                    - 총 기기 수: `{total_devices}`대
-                      - 알림판: `1`대 ({board_type}, 월 `{board_monthly:,}`원)
-                      - 매장용 기기: `{store_device_count}`대 ({device_type}, 월 `{device_monthly:,}`원)
+                    - 총 기기 수: `{st.session_state.total_devices}`대
+                      - 알림판: `1`대 ({st.session_state.board_type}, 월 `{st.session_state.board_monthly:,}`원)
+                      - 매장용 기기: `{st.session_state.store_device_count}`대 ({st.session_state.device_type}, 월 `{st.session_state.device_monthly:,}`원)
 
                     ### 2. 수수료 계산 상세
                     #### 2.1 기본 수수료
-                    - 기본 수수료 1: `{total_devices:,}`대 × `{config['commission']['basic1']:,}`원 = `{total_devices * config['commission']['basic1']:,}`원
-                    - 기본 수수료 2: `{total_devices:,}`대 × `{config['commission']['basic2']:,}`원 = `{total_devices * config['commission']['basic2']:,}`원
+                    - 기본 수수료 1: `{st.session_state.total_devices:,}`대 × `{config['commission']['basic1']:,}`원 = `{st.session_state.total_devices * config['commission']['basic1']:,}`원
+                    - 기본 수수료 2: `{st.session_state.total_devices:,}`대 × `{config['commission']['basic2']:,}`원 = `{st.session_state.total_devices * config['commission']['basic2']:,}`원
                     
                     #### 2.2 조건부 수수료
                     """)
@@ -343,31 +484,24 @@ def main():
                     commission_details = []
                     
                     # 기본 수수료
-                    base_commission = total_devices * (config['commission']['basic1'] + config['commission']['basic2'])
+                    base_commission = st.session_state.total_devices * (config['commission']['basic1'] + config['commission']['basic2'])
                     commission_details.append(["기본 수수료", f"`{base_commission:,}`원"])
-                    
-                    # 5대 이상 조건
-                    if total_devices >= 5:
-                        commission_details.append(["5대 이상 보너스", f"`{config['commission']['cond1_over5']:,}`원"])
                     
                     # 구간별 추가 수수료
                     range_bonus = 0
                     range_text = ""
-                    if 5 <= total_devices <= 10:
-                        range_bonus = config['commission']['cond2_range']['5-10']
-                        range_text = "5-10대"
-                    elif 11 <= total_devices <= 20:
-                        range_bonus = config['commission']['cond2_range']['11-20']
-                        range_text = "11-20대"
-                    elif 21 <= total_devices <= 30:
-                        range_bonus = config['commission']['cond2_range']['21-30']
-                        range_text = "21-30대"
-                    elif 31 <= total_devices <= 40:
-                        range_bonus = config['commission']['cond2_range']['31-40']
-                        range_text = "31-40대"
-                    elif total_devices >= 41:
-                        range_bonus = config['commission']['cond2_range']['41-']
-                        range_text = "41대 이상"
+                    if 5 <= st.session_state.total_devices <= 9:
+                        range_bonus = config['commission']['range']['5-9']
+                        range_text = "5-9대"
+                    elif 10 <= st.session_state.total_devices <= 19:
+                        range_bonus = config['commission']['range']['10-19']
+                        range_text = "10-19대"
+                    elif 20 <= st.session_state.total_devices <= 29:
+                        range_bonus = config['commission']['range']['20-29']
+                        range_text = "20-29대"
+                    elif st.session_state.total_devices >= 30:
+                        range_bonus = config['commission']['range']['30+']
+                        range_text = "30대 이상"
                     
                     if range_bonus > 0:
                         commission_details.append([f"구간별 보너스 ({range_text})", f"`{range_bonus:,}`원"])
@@ -375,6 +509,10 @@ def main():
                     # 신한은행 보너스
                     if use_shinhan:
                         commission_details.append(["신한은행 주거래 보너스", f"`{config['commission']['shinhan_bonus']:,}`원"])
+                    
+                    # 땡겨요 앱 설치 보너스
+                    if use_tanggua:
+                        commission_details.append(["땡겨요 앱 설치 보너스", f"`{config['commission']['tanggua_bonus']:,}`원"])
                     
                     # 인터넷 관련 수수료
                     if use_internet_new:
@@ -384,7 +522,7 @@ def main():
                         commission_details.append(["기존 KT 인터넷 보너스", f"`{config['commission']['internet_kt']:,}`원"])
                     
                     # 총 수수료
-                    commission_details.append(["총 수수료", f"`{commission:,}`원"])
+                    commission_details.append(["총 수수료", f"`{st.session_state.commission:,}`원"])
                     
                     # 표 생성 및 표시
                     df = pd.DataFrame(commission_details, columns=["구분", "금액"])
@@ -392,13 +530,13 @@ def main():
                     
                     st.markdown(f"""
                     ### 3. 일시불 처리 계산
-                    - 매장용 기기 일시불 가격: `{config['prices']['store_device'][device_key]['lump_sum']:,}`원
-                    - 총 수수료: `{commission:,}`원
-                    - 일시불 처리 가능 대수: `{actual_devices}`대
+                    - 매장용 기기 일시불 가격: `{config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`원
+                    - 총 수수료: `{st.session_state.commission:,}`원
+                    - 일시불 처리 가능 대수: `{st.session_state.actual_devices}`대
                       - 계산식: min(⌊수수료 ÷ 일시불가격⌋, 매장용기기수)
-                      - = min(⌊`{commission:,}` ÷ `{config['prices']['store_device'][device_key]['lump_sum']:,}`⌋, `{store_device_count}`)
-                      - = min(`{math.floor(commission/config['prices']['store_device'][device_key]['lump_sum'])}`, `{store_device_count}`)
-                      - = `{actual_devices}`
+                      - = min(⌊`{st.session_state.commission:,}` ÷ `{config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`⌋, `{st.session_state.store_device_count}`)
+                      - = min(`{math.floor(st.session_state.commission/config['prices']['store_device'][st.session_state.device_key]['lump_sum'])}`, `{st.session_state.store_device_count}`)
+                      - = `{st.session_state.actual_devices}`
 
                     ### 4. 월 비용 상세 계산
                     """)
@@ -406,16 +544,16 @@ def main():
                     # 월 비용 상세 표 생성
                     monthly_details = [
                         ["구분", "계산식", "금액"],
-                        ["1. 월 서비스 이용료", f"`{config['service_fee']:,}`원 × `{total_devices}`대", f"`{monthly_service_fee:,}`원"],
-                        ["2. 알림판 할부금", f"{board_type} 할부금 (`{board_monthly:,}`원)", f"`{board_monthly:,}`원"],
-                        ["3. 매장용 기기 할부금", f"`{device_monthly:,}`원 × `{remaining_devices}`대", f"`{store_device_monthly:,}`원"],
-                        ["4. 남은 수수료 할인", f"(`{remaining_commission:,}`원 ÷ 36개월)", f"-`{monthly_commission_discount:,.0f}`원"]
+                        ["1. 월 서비스 이용료", f"`{config['service_fee']:,}`원 × `{st.session_state.total_devices}`대", f"`{st.session_state.monthly_service_fee:,}`원"],
+                        ["2. 알림판 할부금", f"{st.session_state.board_type} 할부금 (`{st.session_state.board_monthly:,}`원)", f"`{st.session_state.board_monthly:,}`원"],
+                        ["3. 매장용 기기 할부금", f"`{st.session_state.device_monthly:,}`원 × `{st.session_state.remaining_devices}`대", f"`{st.session_state.store_device_monthly:,}`원"],
+                        ["4. 남은 수수료 할인", f"(`{st.session_state.remaining_commission:,}`원 ÷ 36개월)", f"-`{st.session_state.monthly_commission_discount:,.0f}`원"]
                     ]
                     
-                    if internet_discount > 0:
-                        monthly_details.append(["5. 인터넷 결합 할인", f"월 고정 할인", f"-`{internet_discount:,}`원"])
+                    if st.session_state.internet_discount > 0:
+                        monthly_details.append(["5. 인터넷 결합 할인", f"월 고정 할인", f"-`{st.session_state.internet_discount:,}`원"])
                     
-                    monthly_details.append(["월 총액", "1 + 2 + 3 - 4 - 5", f"`{final_monthly:,.0f}`원"])
+                    monthly_details.append(["월 총액", "1 + 2 + 3 - 4 - 5", f"`{st.session_state.final_monthly:,.0f}`원"])
                     
                     df_monthly = pd.DataFrame(monthly_details[1:], columns=monthly_details[0])
                     st.table(df_monthly)
@@ -423,14 +561,14 @@ def main():
                     st.markdown(f"""
                     ### 5. 기기당 월 예상 금액 계산
                     - 계산식: 월 총액 ÷ 총 기기 수
-                    - = `{final_monthly:,.0f}`원 ÷ `{total_devices}`대
-                    - = `{per_device_monthly:,.0f}`원
+                    - = `{st.session_state.final_monthly:,.0f}`원 ÷ `{st.session_state.total_devices}`대
+                    - = `{st.session_state.per_device_monthly:,.0f}`원
 
                     ### 6. 36개월 총 비용 예상
-                    - 월 고정 비용: `{final_monthly:,.0f}`원
-                    - 36개월 총 비용: `{final_monthly * 36:,}`원
-                    - 일시불 처리 비용: `{actual_devices}`대 × `{config['prices']['store_device'][device_key]['lump_sum']:,}`원 = `{actual_devices * config['prices']['store_device'][device_key]['lump_sum']:,}`원
-                    - 남은 수수료: `{remaining_commission:,}`원 (월 `{monthly_commission_discount:,.0f}`원씩 36개월 할인)
+                    - 월 고정 비용: `{st.session_state.final_monthly:,.0f}`원
+                    - 36개월 총 비용: `{st.session_state.final_monthly * 36:,}`원
+                    - 일시불 처리 비용: `{st.session_state.actual_devices}`대 × `{config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`원 = `{st.session_state.actual_devices * config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`원
+                    - 남은 수수료: `{st.session_state.remaining_commission:,}`원 (월 `{st.session_state.monthly_commission_discount:,.0f}`원씩 36개월 할인)
                     """)
     
     # 관리자 페이지
@@ -523,37 +661,29 @@ def main():
             
             # 조건부 수수료
             st.markdown("##### 조건부 수수료")
-            config['commission']['cond1_over5'] = st.number_input(
-                "5대 이상 추가 수수료",
-                value=config['commission']['cond1_over5'],
-                step=10000
-            )
             
             # 구간별 수수료
             st.markdown("##### 구간별 추가 수수료")
-            config['commission']['cond2_range']['5-10'] = st.number_input(
-                "5-10대",
-                value=config['commission']['cond2_range']['5-10'],
+            
+            # 새로운 구간별 수수료 설정
+            config['commission']['range']['5-9'] = st.number_input(
+                "5~9대", 
+                value=config['commission']['range']['5-9'], 
                 step=10000
             )
-            config['commission']['cond2_range']['11-20'] = st.number_input(
-                "11-20대",
-                value=config['commission']['cond2_range']['11-20'],
+            config['commission']['range']['10-19'] = st.number_input(
+                "10~19대", 
+                value=config['commission']['range']['10-19'], 
                 step=10000
             )
-            config['commission']['cond2_range']['21-30'] = st.number_input(
-                "21-30대",
-                value=config['commission']['cond2_range']['21-30'],
+            config['commission']['range']['20-29'] = st.number_input(
+                "20~29대", 
+                value=config['commission']['range']['20-29'], 
                 step=10000
             )
-            config['commission']['cond2_range']['31-40'] = st.number_input(
-                "31-40대",
-                value=config['commission']['cond2_range']['31-40'],
-                step=10000
-            )
-            config['commission']['cond2_range']['41-'] = st.number_input(
-                "41대 이상",
-                value=config['commission']['cond2_range']['41-'],
+            config['commission']['range']['30+'] = st.number_input(
+                "30대 이상", 
+                value=config['commission']['range']['30+'], 
                 step=10000
             )
             
@@ -564,6 +694,14 @@ def main():
             config['commission']['shinhan_bonus'] = st.number_input(
                 "신한은행 주거래 통장 보너스",
                 value=config['commission']['shinhan_bonus'],
+                step=10000
+            )
+            
+            # 땡겨요 앱 설치 보너스
+            st.markdown("##### 땡겨요 앱 설치 보너스")
+            config['commission']['tanggua_bonus'] = st.number_input(
+                "땡겨요 앱 설치 보너스",
+                value=config['commission']['tanggua_bonus'],
                 step=10000
             )
             
