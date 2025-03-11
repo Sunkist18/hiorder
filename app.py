@@ -41,7 +41,7 @@ def calculate_commission(total_devices, config, use_shinhan, use_internet_new, u
     
     # 인터넷 신규/기존KT 수수료
     if use_internet_new:
-        commission += config['commission']['internet_new']
+        commission += config['commission']['internet_new'] + config['commission']['internet_kt']
     elif use_internet_kt:
         commission += config['commission']['internet_kt']
     
@@ -220,9 +220,9 @@ def main():
             st.markdown("---")
             
             # 매장용 기기 종류
-            st.subheader("매장용 기기 선택")
+            st.subheader("결제방식 선택")
             device_type = st.radio(
-                "매장용 기기 종류를 선택하세요:",
+                "결제방식을 선택하세요:",
                 ["후불형", "선불형"],
                 format_func=lambda x: f"{x} (월 `{config['prices']['store_device']['normal' if x=='후불형' else 'calc']['monthly']:,}`원)",
                 horizontal=True,
@@ -231,14 +231,14 @@ def main():
             
             device_key = "normal" if device_type == "후불형" else "calc"
             
-            st.caption(f"선택된 기기: **{device_type}** (월 `{config['prices']['store_device'][device_key]['monthly']:,}`원)")
+            st.caption(f"선택된 결제방식: **{device_type}** (월 `{config['prices']['store_device'][device_key]['monthly']:,}`원)")
             
             st.markdown("---")
             
             # 매장용 기기 개수
-            st.subheader("매장용 기기 개수")
+            st.subheader("테이블 개수")
             store_device_count = st.number_input(
-                "매장용 기기 수량을 입력하세요:",
+                "테이블 수량을 입력하세요:",
                 min_value=1,
                 value=10,
                 step=1
@@ -249,26 +249,30 @@ def main():
             # 신한은행 주거래 통장
             st.subheader("신한은행 주거래 통장")
             use_shinhan = st.checkbox(
-                f"**신한은행 주거래 통장** 사용 (수수료 +`{config['commission']['shinhan_bonus']/10000:,.0f}`만원)"
+                f"**신한은행 주거래 통장** 사용 (수수료 +`{config['commission']['shinhan_bonus']:,}`원)"
             )
             
             st.markdown("---")
             
             # 인터넷 관련 체크박스
             st.subheader("인터넷 결합")
-            use_internet_new = False
-            use_internet_kt = False
             
-            use_internet_kt = st.checkbox(
-                f"**기존 KT 인터넷** 사용 (수수료 +`{config['commission']['internet_kt']/10000:,.0f}`만원, 월 `{config['internet']['monthly_discount']:,}`원 할인)",
-            )
+            internet_kt_fee = config['commission']['internet_kt']
+            internet_new_fee = config['commission']['internet_new']
+            monthly_discount = config['internet']['monthly_discount']
             
             use_internet_new = st.checkbox(
-                f"**인터넷 신규** 신청 (수수료 +`{config['commission']['internet_new']/10000:,.0f}`만원, 월 `{config['internet']['monthly_discount']:,}`원 할인)",
+                f"**인터넷 신규** 신청 (수수료 +`{internet_new_fee:,}`원, 월 `{monthly_discount:,}`원 할인)",
             )
             
-            if use_internet_new and use_internet_kt:
-                use_internet_kt = False
+            use_internet_kt = st.checkbox(
+                f"**기존 KT 인터넷** 사용 (으랏차차 패키지 +`{internet_kt_fee:,}`원, 월 `{monthly_discount:,}`원 할인)",
+                value=use_internet_new,
+                disabled=use_internet_new
+            )
+            
+            if use_internet_new:
+                st.caption(f"👆 인터넷 신규 신청 시 으랏차차 패키지(`{internet_kt_fee:,}`원)가 자동으로 포함됩니다.")
             
             st.markdown("---")
             
@@ -375,6 +379,7 @@ def main():
                     # 인터넷 관련 수수료
                     if use_internet_new:
                         commission_details.append(["인터넷 신규 신청 보너스", f"`{config['commission']['internet_new']:,}`원"])
+                        commission_details.append(["KT 인터넷 기본 수수료", f"`{config['commission']['internet_kt']:,}`원"])
                     elif use_internet_kt:
                         commission_details.append(["기존 KT 인터넷 보너스", f"`{config['commission']['internet_kt']:,}`원"])
                     
