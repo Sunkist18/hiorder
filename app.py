@@ -365,16 +365,14 @@ def main():
                 device_monthly = config['prices']['store_device'][device_key]['monthly']
                 store_device_monthly = remaining_devices * device_monthly
                 
-                # 총 월 비용
+                # 총 월 비용 (부가세 적용)
                 total_monthly = monthly_service_fee + board_monthly + store_device_monthly
+                total_monthly_with_tax = total_monthly * 1.1  # 부가세 10% 적용
                 
-                # 남은 수수료를 36개월로 나누어 월 비용에서 차감
-                monthly_commission_discount = remaining_commission / 36
-                
-                # 인터넷 결합 할인 적용
+                # 인터넷 결합 할인 적용 (부가세 적용 후 차감)
                 internet_discount = config['internet']['monthly_discount'] if (use_internet_new or use_internet_kt) else 0
                 
-                final_monthly = total_monthly - monthly_commission_discount - internet_discount
+                final_monthly = total_monthly_with_tax - internet_discount
                 
                 # 기기당 월 예상 금액
                 per_device_monthly = final_monthly / total_devices
@@ -391,7 +389,7 @@ def main():
                 st.session_state.remaining_devices = remaining_devices
                 st.session_state.store_device_monthly = store_device_monthly
                 st.session_state.total_monthly = total_monthly
-                st.session_state.monthly_commission_discount = monthly_commission_discount
+                st.session_state.total_monthly_with_tax = total_monthly_with_tax
                 st.session_state.internet_discount = internet_discount
                 st.session_state.final_monthly = final_monthly
                 st.session_state.per_device_monthly = per_device_monthly
@@ -406,8 +404,10 @@ def main():
                 # 기기당 월 예상 금액
                 col1, col2 = st.columns([3, 2])
                 with col1:
-                    st.markdown(f"### 기기당 월 예상 금액: **{st.session_state.per_device_monthly:,.0f}**원")
-                    st.caption(f"36개월 총 비용: `{st.session_state.final_monthly * 36:,}`원")
+                    # 부가세 포함 및 별도 금액 표시
+                    per_device_tax_excluded = st.session_state.per_device_monthly / 1.1
+                    st.markdown(f"### 기기당 월 예상 금액: **{per_device_tax_excluded:,.0f}**원 (잔여 수수료: `{st.session_state.remaining_commission:,}`원)\n**{st.session_state.per_device_monthly:,.0f}**원(부가세포함), ")
+                    st.caption(f"36개월 총 비용: `{st.session_state.final_monthly * 36:,.0f}`원 ")
                 
                 with col2:
                     # 수수료별도적용 체크박스 상태 유지
@@ -450,9 +450,14 @@ def main():
                                 store_device_monthly_custom = remaining_devices_custom * st.session_state.device_monthly
                                 
                                 total_monthly_custom = st.session_state.monthly_service_fee + st.session_state.board_monthly + store_device_monthly_custom
-                                monthly_commission_discount_custom = remaining_commission_custom / 36
                                 
-                                final_monthly_custom = total_monthly_custom - monthly_commission_discount_custom - st.session_state.internet_discount
+                                # 부가세 10% 적용
+                                total_monthly_with_tax_custom = total_monthly_custom * 1.1
+                                
+                                # 인터넷 결합 할인 적용 (부가세 적용 후 차감)
+                                internet_discount_custom = config['internet']['monthly_discount'] if (use_internet_new or use_internet_kt) else 0
+                                
+                                final_monthly_custom = total_monthly_with_tax_custom - internet_discount_custom
                                 
                                 per_device_monthly_custom = final_monthly_custom / st.session_state.total_devices
                                 
@@ -460,10 +465,13 @@ def main():
                                 commission_diff = custom_commission_amount - st.session_state.commission
                                 monthly_diff = per_device_monthly_custom - st.session_state.per_device_monthly
                                 
-                                # 결과를 색상으로 구분하여 표시
-                                st.markdown(f"### 재계산된 기기당 월 예상 금액: **{per_device_monthly_custom:,.0f}**원")
+                                # 부가세 별도 금액 계산
+                                per_device_tax_excluded_custom = per_device_monthly_custom / 1.1
                                 
-                                st.caption(f"36개월 총 비용: `{final_monthly_custom * 36:,}`원")
+                                # 결과를 색상으로 구분하여 표시
+                                st.markdown(f"### 재계산된 기기당 월 예상 금액: **{per_device_tax_excluded_custom:,.0f}**원 (잔여 수수료: `{remaining_commission_custom:,}`원)\n**{per_device_monthly_custom:,.0f}**원(부가세포함), ")
+                                
+                                st.caption(f"36개월 총 비용: `{final_monthly_custom * 36:,.0f}`원 ")
                                 
                                 # 월 비용 상세 표 생성 (수수료별도적용)
                                 monthly_details_custom = [
@@ -471,13 +479,13 @@ def main():
                                     ["1. 월 서비스 이용료", f"`{config['service_fee']:,}`원 × `{st.session_state.total_devices}`대", f"`{st.session_state.monthly_service_fee:,}`원"],
                                     ["2. 알림판 할부금", f"{st.session_state.board_type} 할부금 (`{st.session_state.board_monthly:,}`원)", f"`{st.session_state.board_monthly:,}`원"],
                                     ["3. 매장용 기기 할부금", f"`{st.session_state.device_monthly:,}`원 × `{remaining_devices_custom}`대", f"`{store_device_monthly_custom:,}`원"],
-                                    ["4. 남은 수수료 할인", f"(`{remaining_commission_custom:,}`원 ÷ 36개월)", f"-`{monthly_commission_discount_custom:,.0f}`원"]
+                                    ["4. 부가세 10%", f"(1 + 2 + 3) × 0.1", f"`{(st.session_state.monthly_service_fee + st.session_state.board_monthly + store_device_monthly_custom) * 0.1:,.0f}`원"]
                                 ]
                                 
                                 if st.session_state.internet_discount > 0:
                                     monthly_details_custom.append(["5. 인터넷 결합 할인", f"월 고정 할인", f"-`{st.session_state.internet_discount:,}`원"])
                                 
-                                monthly_details_custom.append(["월 총액", "1 + 2 + 3 - 4 - 5", f"`{final_monthly_custom:,.0f}`원"])
+                                monthly_details_custom.append(["월 총액", "(1 + 2 + 3) × 1.1 - 5", f"`{final_monthly_custom:,.0f}`원"])
                                 
                                 df_monthly_custom = pd.DataFrame(monthly_details_custom[1:], columns=monthly_details_custom[0])
                                 st.table(df_monthly_custom)
@@ -486,13 +494,13 @@ def main():
                                 ### 5. 기기당 월 예상 금액 계산 (수수료별도적용)
                                 - 계산식: 월 총액 ÷ 총 기기 수
                                 - = `{final_monthly_custom:,.0f}`원 ÷ `{st.session_state.total_devices}`대
-                                - = `{per_device_monthly_custom:,.0f}`원
+                                - = `{per_device_monthly_custom:,.0f}`원(부가세포함), `{per_device_tax_excluded_custom:,.0f}`원(부가세별도)
 
                                 ### 6. 36개월 총 비용 예상 (수수료별도적용)
                                 - 월 고정 비용: `{final_monthly_custom:,.0f}`원
-                                - 36개월 총 비용: `{final_monthly_custom * 36:,}`원
+                                - 36개월 총 비용: `{final_monthly_custom * 36}`원
                                 - 일시불 처리 비용: `{actual_devices_custom}`대 × `{config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`원 = `{actual_devices_custom * config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`원
-                                - 남은 수수료: `{remaining_commission_custom:,}`원 (월 `{monthly_commission_discount_custom:,.0f}`원씩 36개월 할인)
+                                - 남은 수수료: `{remaining_commission_custom:,}`원
                                 
                                 ### 7. 원래 계산과 비교
                                 - 원래 기기당 월 예상 금액: `{st.session_state.per_device_monthly:,.0f}`원
@@ -613,28 +621,31 @@ def main():
                         ["1. 월 서비스 이용료", f"`{config['service_fee']:,}`원 × `{st.session_state.total_devices}`대", f"`{st.session_state.monthly_service_fee:,}`원"],
                         ["2. 알림판 할부금", f"{st.session_state.board_type} 할부금 (`{st.session_state.board_monthly:,}`원)", f"`{st.session_state.board_monthly:,}`원"],
                         ["3. 매장용 기기 할부금", f"`{st.session_state.device_monthly:,}`원 × `{st.session_state.remaining_devices}`대", f"`{st.session_state.store_device_monthly:,}`원"],
-                        ["4. 남은 수수료 할인", f"(`{st.session_state.remaining_commission:,}`원 ÷ 36개월)", f"-`{st.session_state.monthly_commission_discount:,.0f}`원"]
+                        ["4. 부가세 10%", f"(1 + 2 + 3) × 0.1", f"`{st.session_state.total_monthly * 0.1:,.0f}`원"]
                     ]
                     
                     if st.session_state.internet_discount > 0:
                         monthly_details.append(["5. 인터넷 결합 할인", f"월 고정 할인", f"-`{st.session_state.internet_discount:,}`원"])
                     
-                    monthly_details.append(["월 총액", "1 + 2 + 3 - 4 - 5", f"`{st.session_state.final_monthly:,.0f}`원"])
+                    monthly_details.append(["월 총액", "(1 + 2 + 3) × 1.1 - 5", f"`{st.session_state.final_monthly:,.0f}`원"])
                     
                     df_monthly = pd.DataFrame(monthly_details[1:], columns=monthly_details[0])
                     st.table(df_monthly)
+                    
+                    # 부가세 별도 금액 계산
+                    per_device_tax_excluded = st.session_state.per_device_monthly / 1.1
                     
                     st.markdown(f"""
                     ### 5. 기기당 월 예상 금액 계산
                     - 계산식: 월 총액 ÷ 총 기기 수
                     - = `{st.session_state.final_monthly:,.0f}`원 ÷ `{st.session_state.total_devices}`대
-                    - = `{st.session_state.per_device_monthly:,.0f}`원
+                    - = `{st.session_state.per_device_monthly:,.0f}`원(부가세포함), `{per_device_tax_excluded:,.0f}`원(부가세별도)
 
                     ### 6. 36개월 총 비용 예상
                     - 월 고정 비용: `{st.session_state.final_monthly:,.0f}`원
-                    - 36개월 총 비용: `{st.session_state.final_monthly * 36:,}`원
+                    - 36개월 총 비용: `{st.session_state.final_monthly * 36:,.0f}`원
                     - 일시불 처리 비용: `{st.session_state.actual_devices}`대 × `{config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`원 = `{st.session_state.actual_devices * config['prices']['store_device'][st.session_state.device_key]['lump_sum']:,}`원
-                    - 남은 수수료: `{st.session_state.remaining_commission:,}`원 (월 `{st.session_state.monthly_commission_discount:,.0f}`원씩 36개월 할인)
+                    - 남은 수수료: `{st.session_state.remaining_commission:,}`원
                     """)
     
     # 관리자 페이지
